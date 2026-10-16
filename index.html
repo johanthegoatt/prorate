@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prorate: what a part-month of rent really costs</title>
+<meta name="description" content="Moving in or out mid-month? Prorate works out your part-month rent four ways at once, shows the gap between them, and adds up the full cheque you write on day one.">
+<meta name="theme-color" content="#4a5bd4">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='20' r='15' fill='%23ecb63f' stroke='%238a6a1e' stroke-width='3'/%3E%3Crect x='28' y='33' width='8' height='26' rx='2' fill='%23ecb63f' stroke='%238a6a1e' stroke-width='3'/%3E%3Crect x='36' y='46' width='7' height='5' fill='%23ecb63f' stroke='%238a6a1e' stroke-width='2'/%3E%3Ccircle cx='27' cy='19' r='2.4' fill='%23263330'/%3E%3Ccircle cx='37' cy='19' r='2.4' fill='%23263330'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#result">Skip to the breakdown</a>
+<header class="top">
+  <h1>Prorate</h1>
+  <p class="lede">Moving in or out part-way through a month? See what the rent should be four ways at once, and the full cheque for day one.</p>
+</header>
+
+<main>
+  <section class="card" id="step-move" aria-labelledby="h-move">
+    <h2 id="h-move"><span class="num">1</span> Your rent and your date</h2>
+
+    <div class="toggle" role="radiogroup" aria-label="Are you moving in or moving out?">
+      <button type="button" class="seg on" id="seg-in" role="radio" aria-checked="true">Moving in</button>
+      <button type="button" class="seg" id="seg-out" role="radio" aria-checked="false">Moving out</button>
+    </div>
+
+    <div class="row">
+      <label class="field">
+        <span>Full monthly rent</span>
+        <div class="money"><i aria-hidden="true" id="cur">$</i><input id="rent" inputmode="decimal" autocomplete="off" placeholder="1800"></div>
+      </label>
+      <label class="field">
+        <span id="date-label">Day you get the keys</span>
+        <input id="date" type="date" autocomplete="off">
+      </label>
+    </div>
+
+    <label class="check"><input type="checkbox" id="keyday" checked> <span id="keyday-label">Count the day you get the keys (you have them, so you pay for it)</span></label>
+  </section>
+
+  <section class="card" id="step-first" aria-labelledby="h-first">
+    <h2 id="h-first"><span class="num">2</span> What else is due on day one <small>(optional)</small></h2>
+    <p class="hint">Landlords usually want the part-month rent plus these up front. Leave any blank if it doesn't apply.</p>
+    <div class="row">
+      <label class="field"><span>Security deposit</span><div class="money"><i aria-hidden="true" class="cur">$</i><input id="deposit" inputmode="decimal" autocomplete="off" placeholder="1800"></div></label>
+      <label class="field"><span>Last month's rent</span><div class="money"><i aria-hidden="true" class="cur">$</i><input id="lastmonth" inputmode="decimal" autocomplete="off" placeholder="0"></div></label>
+      <label class="field"><span>Other fees</span><div class="money"><i aria-hidden="true" class="cur">$</i><input id="fees" inputmode="decimal" autocomplete="off" placeholder="0"></div></label>
+    </div>
+  </section>
+
+  <section class="card result" id="result" aria-labelledby="h-result" tabindex="-1">
+    <h2 id="h-result"><span class="num">3</span> The breakdown</h2>
+    <p class="sub" id="sub"></p>
+    <div id="methods" aria-live="polite"></div>
+    <p class="spread" id="spread"></p>
+
+    <div class="cheque" id="cheque" hidden>
+      <h3>Day-one cheque</h3>
+      <div id="cheque-lines"></div>
+    </div>
+
+    <div class="traps" id="traps" hidden>
+      <h3>Two things that quietly change the number</h3>
+      <ul id="trap-list"></ul>
+    </div>
+
+    <details class="method-pick" id="method-pick">
+      <summary>Which method does your lease use?</summary>
+      <p class="hint">The breakdown highlights one. Pick the method your lease names, or leave it on the exact-days one, the method most guides call the fairest.</p>
+      <label class="field">
+        <span>Method to total up</span>
+        <select id="method">
+          <option value="actual">Days in this month (fairest)</option>
+          <option value="thirty">Flat 30-day month</option>
+          <option value="daily">Daily rate (365-day year)</option>
+        </select>
+      </label>
+    </details>
+
+    <div class="actions">
+      <button type="button" class="btn" id="copy">Copy the breakdown</button>
+      <button type="button" class="btn ghost" id="share">Copy a share link</button>
+    </div>
+    <p class="status" id="status" role="status"></p>
+    <p class="fine">General information, not legal advice. Your lease and local law decide which method applies.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Made by Johan · <a href="https://github.com/johanthegoatt/prorate">Source</a></p>
+</footer>
+
+<div class="kee-dock" id="kee-dock">
+  <div class="bubble" id="kee-bubble" role="status" aria-live="polite"></div>
+  <button type="button" class="kee" id="kee" aria-label="Kee the key. Tap for a tip." data-mood="sleepy">
+    <svg viewBox="0 0 120 120" aria-hidden="true">
+      <g class="k-body">
+        <circle class="k-bow" cx="60" cy="40" r="33"/>
+        <circle class="k-bow-in" cx="60" cy="40" r="23"/>
+        <rect class="k-shaft" x="53" y="68" width="14" height="46" rx="4"/>
+        <rect class="k-tooth" x="67" y="92" width="10" height="7" rx="1.5"/>
+        <rect class="k-tooth" x="67" y="104" width="15" height="7" rx="1.5"/>
+        <g class="k-face">
+          <g class="k-eyes">
+            <ellipse class="k-white" cx="50" cy="40" rx="7.5" ry="8.5"/>
+            <ellipse class="k-white" cx="70" cy="40" rx="7.5" ry="8.5"/>
+            <circle class="k-pupil" cx="50" cy="41" r="3.6"/>
+            <circle class="k-pupil" cx="70" cy="41" r="3.6"/>
+            <path class="k-closed" d="M43 41 q7 5 14 0 M63 41 q7 5 14 0"/>
+          </g>
+          <circle class="k-cheek" cx="40" cy="50" r="4"/>
+          <circle class="k-cheek" cx="80" cy="50" r="4"/>
+          <path class="k-mouth happy" d="M52 52 q8 7 16 0"/>
+          <path class="k-mouth worried" d="M52 57 q8 -6 16 0"/>
+          <ellipse class="k-mouth wow" cx="60" cy="55" rx="4.5" ry="5.5"/>
+          <path class="k-mouth sleepy" d="M55 54 h10"/>
+        </g>
+      </g>
+    </svg>
+  </button>
+  <button type="button" class="kee-hide" id="kee-hide" aria-label="Hide Kee">×</button>
+</div>
+
+<script src="src/engine.js"></script>
+<script src="src/kee.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
