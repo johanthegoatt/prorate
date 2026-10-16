@@ -1,0 +1,10 @@
+{
+  "name": "prorate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prorate your rent for a mid-month move, three ways at once, plus the full day-one cheque. Runs in the browser, nothing uploaded. With Kee the key.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
