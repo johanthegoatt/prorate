@@ -1,0 +1,109 @@
+"use strict";
+var test = require("node:test");
+var assert = require("node:assert");
+var P = require("../src/engine.js");
+
+test("daysInMonth knows month lengths and leap years", function () {
+  assert.strictEqual(P.daysInMonth(2026, 1), 31);
+  assert.strictEqual(P.daysInMonth(2026, 2), 28);
+  assert.strictEqual(P.daysInMonth(2024, 2), 29);
+  assert.strictEqual(P.daysInMonth(2026, 4), 30);
+});
+
+test("parseDate rejects impossible dates and bad shapes", function () {
+  assert.deepStrictEqual(P.parseDate("2026-01-18"), { year: 2026, month: 1, day: 18 });
+  assert.strictEqual(P.parseDate("2026-02-30"), null);
+  assert.strictEqual(P.parseDate("2026-13-01"), null);
+  assert.strictEqual(P.parseDate("18/01/2026"), null);
+  assert.strictEqual(P.parseDate(""), null);
+});
+
+test("move-in counts the key day through the end of the month", function () {
+  // Keys on Jan 18, 31-day month => 18..31 inclusive = 14 days.
+  assert.strictEqual(P.occupiedDays({ mode: "movein", day: 18, daysInMonth: 31, countKeyDay: true }), 14);
+  assert.strictEqual(P.occupiedDays({ mode: "movein", day: 18, daysInMonth: 31, countKeyDay: false }), 13);
+});
+
+test("move-out counts from the 1st to the last day", function () {
+  assert.strictEqual(P.occupiedDays({ mode: "moveout", day: 10, daysInMonth: 31, countKeyDay: true }), 10);
+  assert.strictEqual(P.occupiedDays({ mode: "moveout", day: 10, daysInMonth: 31, countKeyDay: false }), 9);
+});
+
+test("the Jan 18 / $1800 worked example matches both methods", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-18", mode: "movein", method: "actual" });
+  assert.strictEqual(r.occupied, 14);
+  assert.strictEqual(r.daysInMonth, 31);
+  var byKey = {};
+  r.methods.forEach(function (m) { byKey[m.key] = m; });
+  assert.strictEqual(byKey.actual.amount, 812.90);
+  assert.strictEqual(byKey.thirty.amount, 840.00);
+});
+
+test("a whole 31-day month: actual equals rent, flat-30 overcharges", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-01", mode: "movein", method: "actual" });
+  assert.strictEqual(r.occupied, 31);
+  assert.strictEqual(r.wholeMonth, true);
+  var byKey = {};
+  r.methods.forEach(function (m) { byKey[m.key] = m; });
+  assert.strictEqual(byKey.actual.amount, 1800.00);
+  assert.strictEqual(byKey.actual.overFullMonth, 0);
+  assert.strictEqual(byKey.thirty.amount, 1860.00);
+  assert.strictEqual(byKey.thirty.overFullMonth, 60.00);
+});
+
+test("February: flat-30 is cheaper than actual days", function () {
+  var r = P.prorate({ rent: 1500, date: "2026-02-15", mode: "movein", method: "actual" });
+  assert.strictEqual(r.daysInMonth, 28);
+  assert.strictEqual(r.occupied, 14); // 15..28
+  var byKey = {};
+  r.methods.forEach(function (m) { byKey[m.key] = m; });
+  // actual daily = 1500/28 = 53.57; flat30 = 50.00. Flat 30 pays less here.
+  assert.ok(byKey.thirty.amount < byKey.actual.amount);
+});
+
+test("cheapest and dearest are flagged, spread is the gap", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-18", mode: "movein", method: "actual" });
+  var cheap = r.methods.filter(function (m) { return m.cheapest; });
+  var dear = r.methods.filter(function (m) { return m.dearest; });
+  assert.ok(cheap.length >= 1);
+  assert.strictEqual(dear.length, 1);
+  assert.strictEqual(r.spread, P.round2(r.high - r.low));
+});
+
+test("daily-rate method uses rent x 12 / 365", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-18", mode: "movein", method: "daily" });
+  var daily = r.methods.filter(function (m) { return m.key === "daily"; })[0];
+  assert.strictEqual(daily.daily, P.round2(1800 * 12 / 365));
+  assert.strictEqual(r.chosen.key, "daily");
+});
+
+test("exactly three distinct methods, no duplicate amounts hiding a bug", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-18", mode: "movein", method: "actual" });
+  assert.strictEqual(r.methods.length, 3);
+  assert.deepStrictEqual(r.methods.map(function (m) { return m.key; }), ["actual", "thirty", "daily"]);
+});
+
+test("first-month cheque adds deposit, last month and fees", function () {
+  var r = P.prorate({
+    rent: 1800, date: "2026-01-18", mode: "movein", method: "actual",
+    deposit: 1800, lastMonth: 1800, fees: 50
+  });
+  assert.strictEqual(r.firstMonth.rent, 812.90);
+  assert.strictEqual(r.firstMonth.total, P.round2(812.90 + 1800 + 1800 + 50));
+});
+
+test("move-out has no first-month cheque", function () {
+  var r = P.prorate({ rent: 1800, date: "2026-01-10", mode: "moveout", method: "actual" });
+  assert.strictEqual(r.firstMonth, null);
+  assert.strictEqual(r.occupied, 10);
+});
+
+test("bad rent and bad date return errors, not numbers", function () {
+  assert.strictEqual(P.prorate({ rent: 0, date: "2026-01-18" }).error, "rent");
+  assert.strictEqual(P.prorate({ rent: 1800, date: "nope" }).error, "date");
+});
+
+test("rent typed with a comma still parses", function () {
+  var r = P.prorate({ rent: "1,800", date: "2026-01-18", mode: "movein", method: "actual" });
+  assert.strictEqual(r.rent, 1800);
+});
