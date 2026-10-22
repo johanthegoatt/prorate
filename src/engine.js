@@ -159,10 +159,82 @@
     };
   }
 
+  // A whole fixed-term lease with a start and an end date: a part-month at each
+  // end and whole months in between. The partial months are prorated each way;
+  // every complete month in the middle is charged at the stated monthly rent,
+  // because that is what leases actually do (proration only touches the ends).
+  function prorateRange(input) {
+    var rent = num(input.rent, NaN);
+    if (!(rent > 0)) return { error: "rent" };
+    var start = parseDate(input.start);
+    var end = parseDate(input.end);
+    if (!start) return { error: "start" };
+    if (!end) return { error: "end" };
+    var startIdx = start.year * 12 + (start.month - 1);
+    var endIdx = end.year * 12 + (end.month - 1);
+    if (endIdx < startIdx || (endIdx === startIdx && end.day < start.day)) return { error: "order" };
+
+    var countKeyDay = input.countKeyDay !== false;
+    var sameMonth = startIdx === endIdx;
+    var fullMonths = sameMonth ? 0 : (endIdx - startIdx - 1);
+
+    var methods = METHODS.map(function (m) {
+      var out = { key: m.key, name: m.name, note: m.note };
+      if (sameMonth) {
+        var dim = daysInMonth(start.year, start.month);
+        var days = end.day - start.day + 1 - (countKeyDay ? 0 : 1);
+        days = Math.max(0, Math.min(dim, days));
+        var daily = dailyRate(rent, m.key, dim);
+        out.first = { days: days, amount: round2(daily * days), daily: round2(daily) };
+        out.last = null;
+        out.fullMonths = 0;
+        out.fullTotal = 0;
+        out.total = out.first.amount;
+      } else {
+        var dimS = daysInMonth(start.year, start.month);
+        var fOcc = occupiedDays({ mode: "movein", day: start.day, daysInMonth: dimS, countKeyDay: countKeyDay });
+        var fDaily = dailyRate(rent, m.key, dimS);
+        out.first = { days: fOcc, amount: round2(fDaily * fOcc), daily: round2(fDaily) };
+
+        var dimE = daysInMonth(end.year, end.month);
+        var lOcc = occupiedDays({ mode: "moveout", day: end.day, daysInMonth: dimE, countKeyDay: countKeyDay });
+        var lDaily = dailyRate(rent, m.key, dimE);
+        out.last = { days: lOcc, amount: round2(lDaily * lOcc), daily: round2(lDaily) };
+
+        out.fullMonths = fullMonths;
+        out.fullTotal = round2(fullMonths * rent);
+        out.total = round2(out.first.amount + out.fullTotal + out.last.amount);
+      }
+      return out;
+    });
+
+    var totals = methods.map(function (m) { return m.total; });
+    var low = Math.min.apply(null, totals);
+    var high = Math.max.apply(null, totals);
+    methods.forEach(function (m) {
+      m.cheapest = m.total === low;
+      m.dearest = m.total === high && high !== low;
+    });
+    var chosen = methods.filter(function (m) { return m.key === findMethod(input.method).key; })[0];
+
+    return {
+      mode: "range",
+      rent: rent,
+      start: start, end: end,
+      startName: MONTHS[start.month - 1], endName: MONTHS[end.month - 1],
+      sameMonth: sameMonth,
+      fullMonths: fullMonths,
+      methods: methods,
+      chosen: chosen,
+      low: low, high: high, spread: round2(high - low)
+    };
+  }
+
   return {
     METHODS: METHODS, MONTHS: MONTHS,
     round2: round2, num: num,
     daysInMonth: daysInMonth, parseDate: parseDate,
-    occupiedDays: occupiedDays, dailyRate: dailyRate, prorate: prorate
+    occupiedDays: occupiedDays, dailyRate: dailyRate, prorate: prorate,
+    prorateRange: prorateRange
   };
 });
