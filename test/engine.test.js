@@ -107,3 +107,50 @@ test("rent typed with a comma still parses", function () {
   var r = P.prorate({ rent: "1,800", date: "2026-01-18", mode: "movein", method: "actual" });
   assert.strictEqual(r.rent, 1800);
 });
+
+// Fixed-term lease: two partial months with whole months in between.
+test("a range with partial first and last months and full months between", function () {
+  // $1500/mo, 20 Jan 2026 to 10 Mar 2026, actual-days method.
+  var r = P.prorateRange({ rent: "1500", start: "2026-01-20", end: "2026-03-10", method: "actual" });
+  assert.ok(!r.error);
+  assert.strictEqual(r.fullMonths, 1); // all of February
+  var m = r.chosen;
+  // January: 20th to 31st inclusive = 12 days of 31. 1500/31*12 = 580.65
+  assert.strictEqual(m.first.days, 12);
+  assert.strictEqual(m.first.amount, 580.65);
+  // February is a whole month at the stated rent.
+  assert.strictEqual(m.fullTotal, 1500);
+  // March: 1st to 10th = 10 days of 31. 1500/31*10 = 483.87
+  assert.strictEqual(m.last.days, 10);
+  assert.strictEqual(m.last.amount, 483.87);
+  assert.strictEqual(m.total, P.round2(580.65 + 1500 + 483.87));
+});
+
+test("a range inside one month is a single partial period", function () {
+  var r = P.prorateRange({ rent: "3000", start: "2026-04-05", end: "2026-04-20", method: "actual" });
+  assert.strictEqual(r.sameMonth, true);
+  assert.strictEqual(r.fullMonths, 0);
+  // 5th to 20th inclusive = 16 days of 30. 3000/30*16 = 1600
+  assert.strictEqual(r.chosen.first.days, 16);
+  assert.strictEqual(r.chosen.first.amount, 1600);
+  assert.strictEqual(r.chosen.last, null);
+  assert.strictEqual(r.chosen.total, 1600);
+});
+
+test("the end date cannot come before the start date", function () {
+  assert.strictEqual(P.prorateRange({ rent: "1000", start: "2026-05-10", end: "2026-05-01", method: "actual" }).error, "order");
+  assert.strictEqual(P.prorateRange({ rent: "1000", start: "2026-06-01", end: "2026-03-01", method: "actual" }).error, "order");
+});
+
+test("dropping the last night takes a day off the final month", function () {
+  var withNight = P.prorateRange({ rent: "1550", start: "2026-01-15", end: "2026-02-10", method: "actual", countKeyDay: true });
+  var without = P.prorateRange({ rent: "1550", start: "2026-01-15", end: "2026-02-10", method: "actual", countKeyDay: false });
+  assert.strictEqual(without.chosen.last.days, withNight.chosen.last.days - 1);
+});
+
+test("all three methods are compared and the spread is reported", function () {
+  var r = P.prorateRange({ rent: "1800", start: "2026-01-18", end: "2026-03-05", method: "thirty" });
+  assert.strictEqual(r.methods.length, 3);
+  assert.ok(r.spread >= 0);
+  assert.ok(r.methods.some(function (m) { return m.cheapest; }));
+});
