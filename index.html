@@ -20,9 +20,10 @@
   <section class="card" id="step-move" aria-labelledby="h-move">
     <h2 id="h-move"><span class="num">1</span> Your rent and your date</h2>
 
-    <div class="toggle" role="radiogroup" aria-label="Are you moving in or moving out?">
+    <div class="toggle" role="radiogroup" aria-label="Are you moving in, moving out, or a whole short let?">
       <button type="button" class="seg on" id="seg-in" role="radio" aria-checked="true">Moving in</button>
       <button type="button" class="seg" id="seg-out" role="radio" aria-checked="false">Moving out</button>
+      <button type="button" class="seg" id="seg-range" role="radio" aria-checked="false">Short let</button>
     </div>
 
     <div class="row">
@@ -33,6 +34,10 @@
       <label class="field">
         <span id="date-label">Day you get the keys</span>
         <input id="date" type="date" autocomplete="off">
+      </label>
+      <label class="field" id="date-end-wrap" hidden>
+        <span>Day you move out</span>
+        <input id="date-end" type="date" autocomplete="off">
       </label>
     </div>
 

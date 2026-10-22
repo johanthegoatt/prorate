@@ -7,8 +7,9 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var els = {
-    segIn: $("seg-in"), segOut: $("seg-out"),
+    segIn: $("seg-in"), segOut: $("seg-out"), segRange: $("seg-range"),
     rent: $("rent"), date: $("date"), keyday: $("keyday"),
+    end: $("date-end"), endWrap: $("date-end-wrap"),
     dateLabel: $("date-label"), keydayLabel: $("keyday-label"),
     deposit: $("deposit"), lastmonth: $("lastmonth"), fees: $("fees"),
     stepFirst: $("step-first"),
@@ -40,23 +41,28 @@
   }
 
   function setMode(next, fromUser) {
-    mode = next === "moveout" ? "moveout" : "movein";
-    var isIn = mode === "movein";
+    mode = next === "moveout" ? "moveout" : next === "range" ? "range" : "movein";
+    var isIn = mode === "movein", isRange = mode === "range";
     els.segIn.classList.toggle("on", isIn);
-    els.segOut.classList.toggle("on", !isIn);
+    els.segOut.classList.toggle("on", mode === "moveout");
+    if (els.segRange) els.segRange.classList.toggle("on", isRange);
     els.segIn.setAttribute("aria-checked", String(isIn));
-    els.segOut.setAttribute("aria-checked", String(!isIn));
-    els.dateLabel.textContent = isIn ? "Day you get the keys" : "Your last day";
-    els.keydayLabel.textContent = isIn
-      ? "Count the day you get the keys (you have them, so you pay for it)"
+    els.segOut.setAttribute("aria-checked", String(mode === "moveout"));
+    if (els.segRange) els.segRange.setAttribute("aria-checked", String(isRange));
+    els.dateLabel.textContent = isRange ? "Day you move in" : isIn ? "Day you get the keys" : "Your last day";
+    els.keydayLabel.textContent = isIn || isRange
+      ? "Count the first and last day (you have the keys, so you pay for them)"
       : "Count your last night (you're still there, so you pay for it)";
-    els.stepFirst.hidden = !isIn;
-    if (fromUser && window.Kee) Kee.react(isIn ? "movein" : "moveout");
+    if (els.endWrap) els.endWrap.hidden = !isRange;
+    els.stepFirst.hidden = !isIn; // deposit extras only make sense moving in
+    if (fromUser && window.Kee) Kee.react(isRange ? "movein" : isIn ? "movein" : "moveout");
     render();
   }
 
   els.segIn.addEventListener("click", function () { setMode("movein", true); });
   els.segOut.addEventListener("click", function () { setMode("moveout", true); });
+  if (els.segRange) els.segRange.addEventListener("click", function () { setMode("range", true); });
+  if (els.end) els.end.addEventListener("input", render);
 
   els.keyday.addEventListener("change", function () {
     if (!els.keyday.checked && window.Kee) Kee.react("keyday:off");
@@ -74,6 +80,7 @@
     return {
       rent: els.rent.value,
       date: els.date.value,
+      end: els.end ? els.end.value : "",
       mode: mode,
       method: els.method.value,
       countKeyDay: els.keyday.checked,
@@ -86,6 +93,7 @@
   var lastResult = null;
 
   function render() {
+    if (mode === "range") { renderRange(); return; }
     var input = current();
     var r = E.prorate(input);
     var hasRent = String(input.rent).trim() !== "";
@@ -144,6 +152,65 @@
     if (window.Kee) Kee.context({ ready: true, result: true });
   }
 
+  // The fixed-term lease view: a part-month each end and whole months between.
+  function renderRange() {
+    var input = current();
+    var r = E.prorateRange({ rent: input.rent, start: input.date, end: input.end, method: input.method, countKeyDay: input.countKeyDay });
+    var hasRent = String(input.rent).trim() !== "";
+    var ready = hasRent && String(input.date).trim() !== "" && String(input.end).trim() !== "";
+    els.rent.setAttribute("aria-invalid", hasRent && r.error === "rent" ? "true" : "false");
+    els.cheque.hidden = true;
+    els.traps.hidden = true;
+
+    if (r.error) {
+      lastResult = null;
+      els.sub.textContent = "";
+      els.methods.innerHTML = "<p class='hint'>" +
+        (!ready ? "Enter the rent, the move-in day and the move-out day."
+          : r.error === "rent" ? "That rent doesn't look like a number."
+          : r.error === "order" ? "The move-out day has to be on or after the move-in day."
+          : "That date can't be right.") + "</p>";
+      els.spread.textContent = "";
+      if (window.Kee) Kee.context({ ready: ready, result: false, bad: !!r.error && ready });
+      return;
+    }
+
+    lastResult = r;
+    var span = r.sameMonth
+      ? ordinal(r.start.day) + " to " + ordinal(r.end.day) + " of " + r.startName
+      : ordinal(r.start.day) + " " + r.startName + " to " + ordinal(r.end.day) + " " + r.endName;
+    els.sub.textContent = "A short let from the " + span + ": a part-month each end" +
+      (r.fullMonths > 0 ? " and " + r.fullMonths + " whole month" + (r.fullMonths === 1 ? "" : "s") + " between" : "") + ".";
+
+    els.methods.innerHTML = "";
+    r.methods.forEach(function (m) {
+      var row = document.createElement("div");
+      row.className = "method" + (m.key === r.chosen.key ? " pick" : "");
+      var tags = "";
+      if (m.key === r.chosen.key) tags += "<span class='tag pick'>Totalled</span>";
+      if (m.cheapest) tags += "<span class='tag good'>Lowest</span>";
+      if (m.dearest) tags += "<span class='tag warn'>Highest</span>";
+      var parts = "<p class='m-daily'>First month: " + money(m.first.amount) + " (" + m.first.days + " day" + (m.first.days === 1 ? "" : "s") + ")</p>";
+      if (!r.sameMonth) {
+        if (m.fullMonths > 0) parts += "<p class='m-daily'>" + m.fullMonths + " whole month" + (m.fullMonths === 1 ? "" : "s") + ": " + money(m.fullTotal) + "</p>";
+        parts += "<p class='m-daily'>Last month: " + money(m.last.amount) + " (" + m.last.days + " day" + (m.last.days === 1 ? "" : "s") + ")</p>";
+      }
+      row.innerHTML =
+        "<div class='m-main'><h3>" + m.name + " " + tags + "</h3>" + parts +
+          "<p class='m-note'>" + m.note + "</p></div>" +
+        "<div class='m-amount'>" + money(m.total) + "</div>";
+      els.methods.appendChild(row);
+    });
+
+    if (r.spread > 0) {
+      els.spread.innerHTML = "The whole-let total ranges from " + money(r.low) + " to " + money(r.high) +
+        " — a <b>" + money(r.spread) + "</b> gap between methods. Your lease decides which one applies.";
+    } else {
+      els.spread.textContent = "";
+    }
+    if (window.Kee) Kee.context({ ready: true, result: true });
+  }
+
   function renderCheque(r) {
     if (!r.firstMonth) { els.cheque.hidden = true; return; }
     var f = r.firstMonth;
@@ -184,6 +251,21 @@
     var r = lastResult;
     if (!r) { flash("Fill in the rent and date first."); return; }
     var lines = [];
+    if (r.mode === "range") {
+      lines.push("Prorate — short let, " + ordinal(r.start.day) + " " + r.startName +
+        " to " + ordinal(r.end.day) + " " + r.endName);
+      lines.push("Rent " + money(r.rent) + "/month");
+      lines.push("");
+      r.methods.forEach(function (m) {
+        var bits = ["first " + money(m.first.amount)];
+        if (!r.sameMonth) { if (m.fullMonths > 0) bits.push(m.fullMonths + " full " + money(m.fullTotal)); bits.push("last " + money(m.last.amount)); }
+        lines.push((m.key === r.chosen.key ? "> " : "  ") + m.name + ": " + money(m.total) + " (" + bits.join(" + ") + ")");
+      });
+      lines.push("");
+      lines.push("Gap between methods: " + money(r.spread));
+      copyText(lines.join("\n"), "copied", "Breakdown copied.");
+      return;
+    }
     lines.push("Prorate — " + (r.mode === "movein" ? "moving in" : "moving out") +
       " on the " + ordinal(r.day) + " of " + r.monthName);
     lines.push("Rent " + money(r.rent) + "/month, " + r.occupied + " of " + r.daysInMonth + " days");
@@ -232,7 +314,8 @@
     var p = new URLSearchParams();
     if (s.rent) p.set("r", s.rent);
     if (s.date) p.set("d", s.date);
-    p.set("m", s.mode === "moveout" ? "out" : "in");
+    p.set("m", s.mode === "moveout" ? "out" : s.mode === "range" ? "range" : "in");
+    if (s.mode === "range" && s.end) p.set("e", s.end);
     p.set("x", s.method);
     p.set("k", s.countKeyDay ? "1" : "0");
     if (s.deposit) p.set("dep", s.deposit);
@@ -251,7 +334,9 @@
     if (p.has("dep")) els.deposit.value = p.get("dep");
     if (p.has("lm")) els.lastmonth.value = p.get("lm");
     if (p.has("f")) els.fees.value = p.get("f");
-    setMode(p.get("m") === "out" ? "moveout" : "movein", false);
+    if (p.has("e") && els.end) els.end.value = p.get("e");
+    var m = p.get("m");
+    setMode(m === "out" ? "moveout" : m === "range" ? "range" : "movein", false);
     return true;
   }
 
