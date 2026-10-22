@@ -1,6 +1,6 @@
 # Prorate
 
-Moving in or out part-way through a month? Prorate works out the part-month rent three ways at once, shows the gap between them, and adds up the full cheque you write on day one.
+Moving in or out part-way through a month? Prorate works out the part-month rent three ways at once, shows the gap between them, and adds up the full cheque you write on day one. For a short let with a start and an end date, it prices the whole thing: a part-month at each end and the whole months in between.
 
 **Use it:** https://prorate.johanthegoat.xyz
 
@@ -21,6 +21,7 @@ Most calculators pick one method and hand you a single number, so you can't tell
 - **Count the key day.** Moving in, you get the keys on the move-in day, so that day counts; moving out, your last night counts. Dropping it quietly takes a day's rent off the bill, which is why it's worth being explicit. There's a switch for the case where you genuinely don't stay the last day.
 - **The day-one cheque.** On move-in, landlords usually want the part-month rent plus a deposit, sometimes last month's rent, and any fees, all at once. Prorate totals the real amount you hand over on day one.
 - **The two traps, called out.** Which method the lease uses, and whether the key day is counted, are the two things that move the number, so the result names both.
+- **Whole short lets.** Pick a move-in and a move-out date and Prorate prices the full tenancy: the part-month you pay when you arrive, every complete month at the stated rent, and the part-month when you leave, totalled all three ways. Proration only touches the two ends, because that is what leases actually do.
 - **Share without uploading.** Copy the breakdown as plain text, or a link that carries your numbers in the URL fragment. Nothing is sent anywhere; the whole thing runs in the browser.
 
 The amounts, the day count and the currency all update as you type. Currency symbol is guessed from your browser language and only affects the label.
