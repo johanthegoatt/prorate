@@ -8,7 +8,7 @@
 
   var els = {
     segIn: $("seg-in"), segOut: $("seg-out"), segRange: $("seg-range"),
-    rent: $("rent"), date: $("date"), keyday: $("keyday"),
+    rent: $("rent"), period: $("period"), date: $("date"), keyday: $("keyday"),
     end: $("date-end"), endWrap: $("date-end-wrap"),
     dateLabel: $("date-label"), keydayLabel: $("keyday-label"),
     deposit: $("deposit"), lastmonth: $("lastmonth"), fees: $("fees"),
@@ -72,6 +72,7 @@
     if (els.method.value === "thirty" && window.Kee) Kee.react("method:thirty");
     render();
   });
+  if (els.period) els.period.addEventListener("change", render);
   ["rent", "date", "deposit", "lastmonth", "fees"].forEach(function (k) {
     els[k].addEventListener("input", render);
   });
@@ -79,6 +80,7 @@
   function current() {
     return {
       rent: els.rent.value,
+      period: els.period ? els.period.value : "month",
       date: els.date.value,
       end: els.end ? els.end.value : "",
       mode: mode,
@@ -117,8 +119,16 @@
 
     lastResult = r;
     var verb = r.mode === "movein" ? "Moving in on the " : "Last day the ";
-    els.sub.textContent = verb + ordinal(r.day) + " of " + r.monthName + ": you pay for " +
+    var sub = verb + ordinal(r.day) + " of " + r.monthName + ": you pay for " +
       r.occupied + " of " + r.daysInMonth + " days.";
+    if (r.monthlyFromQuoted) {
+      sub += " That's " + sym + money(r.rent) + " a month";
+      if (r.period === "week") {
+        var g = E.weeklyGap(r.quoted);
+        sub += " (" + sym + money(r.quoted) + "/week × 52 ÷ 12, not × 4, which would be " + sym + money(g.timesFour) + ").";
+      } else { sub += "."; }
+    }
+    els.sub.textContent = sub;
 
     els.methods.innerHTML = "";
     r.methods.forEach(function (m) {

@@ -28,8 +28,17 @@
 
     <div class="row">
       <label class="field">
-        <span>Full monthly rent</span>
+        <span>Rent</span>
         <div class="money"><i aria-hidden="true" id="cur">$</i><input id="rent" inputmode="decimal" autocomplete="off" placeholder="1800"></div>
+      </label>
+      <label class="field">
+        <span>quoted</span>
+        <select id="period">
+          <option value="month">per month</option>
+          <option value="week">per week</option>
+          <option value="fourweek">per 4 weeks</option>
+          <option value="year">per year</option>
+        </select>
       </label>
       <label class="field">
         <span id="date-label">Day you get the keys</span>
