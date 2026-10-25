@@ -154,3 +154,45 @@ test("all three methods are compared and the spread is reported", function () {
   assert.ok(r.spread >= 0);
   assert.ok(r.methods.some(function (m) { return m.cheapest; }));
 });
+
+test("toMonthly converts a quoted period to a monthly rent", function () {
+  assert.strictEqual(P.toMonthly(1200, "month"), 1200);
+  // 300/week over a year is 300*52/12 = 1300/month, not 1200 (which is x4).
+  assert.strictEqual(P.toMonthly(300, "week"), 1300);
+  assert.strictEqual(P.toMonthly(600, "fourweek"), 650); // 600*13/12
+  assert.strictEqual(P.toMonthly(15600, "year"), 1300);
+});
+
+test("weeklyGap shows how far the times-four shortcut falls short", function () {
+  var g = P.weeklyGap(300);
+  assert.strictEqual(g.right, 1300);
+  assert.strictEqual(g.timesFour, 1200);
+  assert.strictEqual(g.shortBy, 100);
+});
+
+test("a weekly rent is turned into the right monthly before prorating", function () {
+  var r = P.prorate({ rent: "300", period: "week", date: "2026-03-01", method: "actual" });
+  assert.ok(!r.error);
+  assert.strictEqual(r.quoted, 300);
+  assert.strictEqual(r.period, "week");
+  assert.strictEqual(r.rent, 1300);           // 300 * 52 / 12
+  assert.strictEqual(r.monthlyFromQuoted, true);
+  // A whole March on actual-days is exactly the monthly rent.
+  var actual = r.methods.find(function (m) { return m.key === "actual"; });
+  assert.strictEqual(actual.amount, 1300);
+});
+
+test("the default period is monthly, so existing results are unchanged", function () {
+  var a = P.prorate({ rent: "1300", date: "2026-03-01", method: "actual" });
+  var b = P.prorate({ rent: "1300", period: "month", date: "2026-03-01", method: "actual" });
+  assert.strictEqual(a.rent, 1300);
+  assert.strictEqual(a.monthlyFromQuoted, false);
+  assert.deepStrictEqual(a.methods, b.methods);
+});
+
+test("a weekly rent carries through a full-tenancy range too", function () {
+  var r = P.prorateRange({ rent: "300", period: "week", start: "2026-01-10", end: "2026-04-20", method: "actual" });
+  assert.ok(!r.error);
+  assert.strictEqual(r.rent, 1300);
+  assert.strictEqual(r.monthlyFromQuoted, true);
+});
