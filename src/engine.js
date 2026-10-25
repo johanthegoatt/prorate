@@ -46,6 +46,32 @@
     return isFinite(n) ? n : d;
   }
 
+  // Rents are quoted over different periods, and the monthly figure the whole
+  // calculation hangs on depends on getting that conversion right. A weekly
+  // rent is a month's rent at `week x 52 / 12`, because a year has 52 weeks and
+  // 12 months, not `week x 4`: four weeks is only 28 days, so x4 undercounts a
+  // monthly rent by about 7.7%. A four-weekly rent (some UK lets bill this way)
+  // is `x 13 / 12`, since 52 / 4 = 13 periods a year. A yearly rent is `/ 12`.
+  var PERIODS = {
+    month: { label: "per month", toMonthly: function (a) { return a; } },
+    week: { label: "per week", toMonthly: function (a) { return a * 52 / 12; } },
+    fourweek: { label: "per 4 weeks", toMonthly: function (a) { return a * 13 / 12; } },
+    year: { label: "per year", toMonthly: function (a) { return a / 12; } }
+  };
+
+  function toMonthly(amount, period) {
+    var p = PERIODS[period] || PERIODS.month;
+    return p.toMonthly(amount);
+  }
+
+  // The gap between the right monthly rent from a weekly figure and the common
+  // "times four" shortcut, for the warning the page shows.
+  function weeklyGap(weekly) {
+    var right = weekly * 52 / 12;
+    var naive = weekly * 4;
+    return { right: round2(right), timesFour: round2(naive), shortBy: round2(right - naive) };
+  }
+
   // Days in a given month. month is 1..12. Handles leap Februaries.
   function daysInMonth(year, month) {
     return new Date(year, month, 0).getDate();
@@ -94,8 +120,10 @@
   // Work out every method for one part-month, then the full move-in cheque.
   // Returns { error } when the rent or date can't be used.
   function prorate(input) {
-    var rent = num(input.rent, NaN);
-    if (!(rent > 0)) return { error: "rent" };
+    var quoted = num(input.rent, NaN);
+    if (!(quoted > 0)) return { error: "rent" };
+    var period = PERIODS[input.period] ? input.period : "month";
+    var rent = round2(toMonthly(quoted, period));
     var d = parseDate(input.date);
     if (!d) return { error: "date" };
 
@@ -142,6 +170,9 @@
     return {
       mode: mode,
       rent: rent,
+      quoted: quoted,
+      period: period,
+      monthlyFromQuoted: period !== "month",
       year: d.year,
       month: d.month,
       monthName: MONTHS[d.month - 1],
@@ -164,8 +195,10 @@
   // every complete month in the middle is charged at the stated monthly rent,
   // because that is what leases actually do (proration only touches the ends).
   function prorateRange(input) {
-    var rent = num(input.rent, NaN);
-    if (!(rent > 0)) return { error: "rent" };
+    var quoted = num(input.rent, NaN);
+    if (!(quoted > 0)) return { error: "rent" };
+    var period = PERIODS[input.period] ? input.period : "month";
+    var rent = round2(toMonthly(quoted, period));
     var start = parseDate(input.start);
     var end = parseDate(input.end);
     if (!start) return { error: "start" };
@@ -220,6 +253,9 @@
     return {
       mode: "range",
       rent: rent,
+      quoted: quoted,
+      period: period,
+      monthlyFromQuoted: period !== "month",
       start: start, end: end,
       startName: MONTHS[start.month - 1], endName: MONTHS[end.month - 1],
       sameMonth: sameMonth,
@@ -231,8 +267,8 @@
   }
 
   return {
-    METHODS: METHODS, MONTHS: MONTHS,
-    round2: round2, num: num,
+    METHODS: METHODS, MONTHS: MONTHS, PERIODS: PERIODS,
+    round2: round2, num: num, toMonthly: toMonthly, weeklyGap: weeklyGap,
     daysInMonth: daysInMonth, parseDate: parseDate,
     occupiedDays: occupiedDays, dailyRate: dailyRate, prorate: prorate,
     prorateRange: prorateRange
