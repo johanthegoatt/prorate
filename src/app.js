@@ -11,7 +11,7 @@
     rent: $("rent"), period: $("period"), date: $("date"), keyday: $("keyday"),
     end: $("date-end"), endWrap: $("date-end-wrap"),
     dateLabel: $("date-label"), keydayLabel: $("keyday-label"),
-    deposit: $("deposit"), lastmonth: $("lastmonth"), fees: $("fees"),
+    deposit: $("deposit"), lastmonth: $("lastmonth"), fees: $("fees"), claimed: $("claimed"),
     stepFirst: $("step-first"),
     method: $("method"),
     sub: $("sub"), methods: $("methods"), spread: $("spread"),
@@ -73,7 +73,7 @@
     render();
   });
   if (els.period) els.period.addEventListener("change", render);
-  ["rent", "date", "deposit", "lastmonth", "fees"].forEach(function (k) {
+  ["rent", "date", "deposit", "lastmonth", "fees", "claimed"].forEach(function (k) {
     els[k].addEventListener("input", render);
   });
 
@@ -88,7 +88,8 @@
       countKeyDay: els.keyday.checked,
       deposit: els.deposit.value,
       lastMonth: els.lastmonth.value,
-      fees: els.fees.value
+      fees: els.fees.value,
+      claimed: els.claimed.value
     };
   }
 
@@ -240,6 +241,26 @@
     var thirty = r.methods.filter(function (m) { return m.key === "thirty"; })[0];
     var actual = r.methods.filter(function (m) { return m.key === "actual"; })[0];
     var items = [];
+    if (r.claim) {
+      var c = r.claim;
+      if (c.matches) {
+        var mName = (r.methods.filter(function (m) { return m.key === c.matches; })[0] || {}).name || c.matches;
+        var dear = r.high === (r.methods.filter(function (m) { return m.key === c.matches; })[0] || {}).amount && r.spread > 0;
+        items.push("<b>Their figure checks out.</b> The " + money(c.claimed) + " they asked for matches the <b>" +
+          mName + "</b> method" + (dear ? ", which is the dearest of the fair splits here, so it's on the high side but not an overcharge." : ".") +
+          " You can pay it knowing how it was worked out.");
+      } else if (c.overDearest > 0) {
+        items.push("<b>That looks high.</b> The " + money(c.claimed) + " they asked for is " + money(c.overDearest) +
+          " more than even the dearest fair split (" + money(r.high) + "). It's worth asking how they got to it before you pay.");
+      } else if (c.underCheapest > 0) {
+        items.push("<b>That's in your favour.</b> The " + money(c.claimed) + " they asked for is " + money(c.underCheapest) +
+          " less than the cheapest method (" + money(r.low) + "), so you're not being overcharged.");
+      } else {
+        items.push("<b>Their figure.</b> The " + money(c.claimed) + " they asked for sits between the methods, closest to the <b>" +
+          c.nearestName + "</b> one (" + money(r.methods.filter(function (m) { return m.key === c.nearestKey; })[0].amount) + "), " +
+          money(Math.abs(c.diffFromNearest)) + " off.");
+      }
+    }
     var gap = E.round2(thirty.amount - actual.amount);
     items.push("<b>Which method.</b> The flat 30-day method keeps the daily rate the same all year, so a full " +
       r.daysInMonth + "-day month comes to more than one month's rent. The exact-days method is the only one where a whole month equals your rent exactly." +
