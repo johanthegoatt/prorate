@@ -117,6 +117,37 @@
     return METHODS[0];
   }
 
+  // Check a figure the landlord actually asked for against the methods, so a
+  // tenant can see which one it matches, or that it sits above all of them (the
+  // common overcharge: a whole month, or a 31-day month charged over 30) or
+  // below the cheapest. `methods` is the list from prorate(); claimed is the
+  // amount they were quoted. Null when there's no figure to check.
+  function checkClaim(methods, claimed) {
+    var c = num(claimed, NaN);
+    if (!(c >= 0)) return null;
+    c = round2(c);
+    var amounts = methods.map(function (m) { return m.amount; });
+    var low = Math.min.apply(null, amounts);
+    var high = Math.max.apply(null, amounts);
+    var match = null;
+    for (var i = 0; i < methods.length; i++) {
+      if (Math.abs(methods[i].amount - c) <= 0.01) { match = methods[i].key; break; }
+    }
+    var nearest = methods[0];
+    for (var j = 1; j < methods.length; j++) {
+      if (Math.abs(methods[j].amount - c) < Math.abs(nearest.amount - c)) nearest = methods[j];
+    }
+    return {
+      claimed: c,
+      matches: match,
+      nearestKey: nearest.key,
+      nearestName: nearest.name,
+      diffFromNearest: round2(c - nearest.amount),
+      overDearest: c > high + 0.01 ? round2(c - high) : 0,
+      underCheapest: c < low - 0.01 ? round2(low - c) : 0
+    };
+  }
+
   // Work out every method for one part-month, then the full move-in cheque.
   // Returns { error } when the rent or date can't be used.
   function prorate(input) {
@@ -186,7 +217,9 @@
       low: low,
       high: high,
       spread: round2(high - low),
-      firstMonth: firstMonth
+      firstMonth: firstMonth,
+      // If the tenant typed the figure the landlord asked for, how it lines up.
+      claim: (input.claimed != null && input.claimed !== "") ? checkClaim(methods, input.claimed) : null
     };
   }
 
@@ -271,6 +304,6 @@
     round2: round2, num: num, toMonthly: toMonthly, weeklyGap: weeklyGap,
     daysInMonth: daysInMonth, parseDate: parseDate,
     occupiedDays: occupiedDays, dailyRate: dailyRate, prorate: prorate,
-    prorateRange: prorateRange
+    checkClaim: checkClaim, prorateRange: prorateRange
   };
 });
