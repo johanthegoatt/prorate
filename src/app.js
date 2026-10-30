@@ -352,6 +352,7 @@
     if (s.deposit) p.set("dep", s.deposit);
     if (s.lastMonth) p.set("lm", s.lastMonth);
     if (s.fees) p.set("f", s.fees);
+    if (s.claimed) p.set("q", s.claimed);
     return p.toString();
   }
   function decode() {
@@ -365,6 +366,7 @@
     if (p.has("dep")) els.deposit.value = p.get("dep");
     if (p.has("lm")) els.lastmonth.value = p.get("lm");
     if (p.has("f")) els.fees.value = p.get("f");
+    if (p.has("q")) els.claimed.value = p.get("q");
     if (p.has("e") && els.end) els.end.value = p.get("e");
     var m = p.get("m");
     setMode(m === "out" ? "moveout" : m === "range" ? "range" : "movein", false);
