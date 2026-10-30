@@ -196,3 +196,34 @@ test("a weekly rent carries through a full-tenancy range too", function () {
   assert.strictEqual(r.rent, 1300);
   assert.strictEqual(r.monthlyFromQuoted, true);
 });
+
+test("checkClaim matches a landlord's figure to a method or flags an overcharge", () => {
+  // Move in 20 Jan 2026, £1,000/month. 31-day month, 12 days occupied (20th-31st).
+  const r = P.prorate({ rent: "1000", date: "2026-01-20", method: "actual" });
+  const actual = r.methods.find(m => m.key === "actual").amount; // 12/31 * 1000
+  const thirty = r.methods.find(m => m.key === "thirty").amount; // 12/30 * 1000
+
+  // A figure equal to the "actual" method matches it.
+  const m1 = P.checkClaim(r.methods, actual);
+  assert.strictEqual(m1.matches, "actual");
+  assert.strictEqual(m1.overDearest, 0);
+
+  // The 30-day figure is dearer here, and matches "thirty".
+  assert.strictEqual(P.checkClaim(r.methods, thirty).matches, "thirty");
+
+  // A whole month's rent is above every method: an overcharge, flagged.
+  const over = P.checkClaim(r.methods, 1000);
+  assert.strictEqual(over.matches, null);
+  assert.ok(over.overDearest > 0);
+
+  // No figure given -> null.
+  assert.strictEqual(P.checkClaim(r.methods, ""), null);
+});
+
+test("prorate carries the claim check only when a figure is given", () => {
+  const withClaim = P.prorate({ rent: "1200", date: "2026-03-15", method: "actual", claimed: "1200" });
+  assert.ok(withClaim.claim);
+  assert.ok(withClaim.claim.overDearest > 0); // a whole month in a part month
+  const without = P.prorate({ rent: "1200", date: "2026-03-15", method: "actual" });
+  assert.strictEqual(without.claim, null);
+});
