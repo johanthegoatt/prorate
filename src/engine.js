@@ -299,11 +299,54 @@
     };
   }
 
+  // A rent change that lands partway through a month: the old rent for the days
+  // before the change, the new rent from the change date on, worked out by the
+  // same daily-rate methods as a part-month. This is the month a Section 13
+  // increase or a mid-month renewal takes effect, where you owe a blend of the
+  // two rates rather than a clean full month of either. "added" is what the
+  // change adds to that month against a full month at the old rent.
+  function prorateChange(input) {
+    var period = PERIODS[input.period] ? input.period : "month";
+    var oldR = round2(toMonthly(num(input.rent, NaN), period));
+    var newR = round2(toMonthly(num(input.newRent, NaN), period));
+    if (!(oldR > 0)) return { error: "rent" };
+    if (!(newR > 0)) return { error: "newRent" };
+    var d = parseDate(input.date);
+    if (!d) return { error: "date" };
+
+    var dim = daysInMonth(d.year, d.month);
+    var daysOld = Math.max(0, Math.min(dim, d.day - 1)); // days 1..(day-1) at old rent
+    var daysNew = dim - daysOld;                          // the change day onward
+
+    var keys = ["actual", "thirty", "daily"];
+    var methods = keys.map(function (k) {
+      var dOld = dailyRate(oldR, k, dim), dNew = dailyRate(newR, k, dim);
+      var total = round2(daysOld * dOld + daysNew * dNew);
+      var m = findMethod(k);
+      return {
+        key: k,
+        name: k === "daily" ? "Daily rate (x12/365)" : m.name,
+        amount: total,
+        added: round2(total - oldR)
+      };
+    });
+    var amounts = methods.map(function (m) { return m.amount; });
+
+    return {
+      oldRent: oldR, newRent: newR,
+      daysOld: daysOld, daysNew: daysNew, daysInMonth: dim, changeDay: d.day,
+      methods: methods,
+      cheapest: round2(Math.min.apply(null, amounts)),
+      dearest: round2(Math.max.apply(null, amounts)),
+      spread: round2(Math.max.apply(null, amounts) - Math.min.apply(null, amounts))
+    };
+  }
+
   return {
     METHODS: METHODS, MONTHS: MONTHS, PERIODS: PERIODS,
     round2: round2, num: num, toMonthly: toMonthly, weeklyGap: weeklyGap,
     daysInMonth: daysInMonth, parseDate: parseDate,
     occupiedDays: occupiedDays, dailyRate: dailyRate, prorate: prorate,
-    checkClaim: checkClaim, prorateRange: prorateRange
+    checkClaim: checkClaim, prorateRange: prorateRange, prorateChange: prorateChange
   };
 });
