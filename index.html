@@ -24,6 +24,7 @@
       <button type="button" class="seg on" id="seg-in" role="radio" aria-checked="true">Moving in</button>
       <button type="button" class="seg" id="seg-out" role="radio" aria-checked="false">Moving out</button>
       <button type="button" class="seg" id="seg-range" role="radio" aria-checked="false">Short let</button>
+      <button type="button" class="seg" id="seg-change" role="radio" aria-checked="false">Rent change</button>
     </div>
 
     <div class="row">
@@ -43,6 +44,10 @@
       <label class="field">
         <span id="date-label">Day you get the keys</span>
         <input id="date" type="date" autocomplete="off">
+      </label>
+      <label class="field" id="newrent-wrap" hidden>
+        <span>New rent (per the same period)</span>
+        <div class="money"><i aria-hidden="true" class="cur">$</i><input id="newrent" inputmode="decimal" autocomplete="off" placeholder="2000"></div>
       </label>
       <label class="field" id="date-end-wrap" hidden>
         <span>Day you move out</span>

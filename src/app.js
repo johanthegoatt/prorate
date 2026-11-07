@@ -7,7 +7,8 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var els = {
-    segIn: $("seg-in"), segOut: $("seg-out"), segRange: $("seg-range"),
+    segIn: $("seg-in"), segOut: $("seg-out"), segRange: $("seg-range"), segChange: $("seg-change"),
+    newRent: $("newrent"), newRentWrap: $("newrent-wrap"),
     rent: $("rent"), period: $("period"), date: $("date"), keyday: $("keyday"),
     end: $("date-end"), endWrap: $("date-end-wrap"),
     dateLabel: $("date-label"), keydayLabel: $("keyday-label"),
@@ -41,20 +42,25 @@
   }
 
   function setMode(next, fromUser) {
-    mode = next === "moveout" ? "moveout" : next === "range" ? "range" : "movein";
-    var isIn = mode === "movein", isRange = mode === "range";
+    mode = next === "moveout" ? "moveout" : next === "range" ? "range" : next === "change" ? "change" : "movein";
+    var isIn = mode === "movein", isRange = mode === "range", isChange = mode === "change";
     els.segIn.classList.toggle("on", isIn);
     els.segOut.classList.toggle("on", mode === "moveout");
     if (els.segRange) els.segRange.classList.toggle("on", isRange);
+    if (els.segChange) els.segChange.classList.toggle("on", isChange);
     els.segIn.setAttribute("aria-checked", String(isIn));
     els.segOut.setAttribute("aria-checked", String(mode === "moveout"));
     if (els.segRange) els.segRange.setAttribute("aria-checked", String(isRange));
-    els.dateLabel.textContent = isRange ? "Day you move in" : isIn ? "Day you get the keys" : "Your last day";
+    if (els.segChange) els.segChange.setAttribute("aria-checked", String(isChange));
+    els.dateLabel.textContent = isChange ? "Day the new rent starts"
+      : isRange ? "Day you move in" : isIn ? "Day you get the keys" : "Your last day";
     els.keydayLabel.textContent = isIn || isRange
       ? "Count the first and last day (you have the keys, so you pay for them)"
       : "Count your last night (you're still there, so you pay for it)";
     if (els.endWrap) els.endWrap.hidden = !isRange;
+    if (els.newRentWrap) els.newRentWrap.hidden = !isChange;
     els.stepFirst.hidden = !isIn; // deposit extras only make sense moving in
+    if (els.keydayWrap === undefined) { /* keyday applies to day counting, not a rent change */ }
     if (fromUser && window.Kee) Kee.react(isRange ? "movein" : isIn ? "movein" : "moveout");
     render();
   }
@@ -62,6 +68,8 @@
   els.segIn.addEventListener("click", function () { setMode("movein", true); });
   els.segOut.addEventListener("click", function () { setMode("moveout", true); });
   if (els.segRange) els.segRange.addEventListener("click", function () { setMode("range", true); });
+  if (els.segChange) els.segChange.addEventListener("click", function () { setMode("change", true); });
+  if (els.newRent) els.newRent.addEventListener("input", render);
   if (els.end) els.end.addEventListener("input", render);
 
   els.keyday.addEventListener("change", function () {
@@ -83,6 +91,7 @@
       period: els.period ? els.period.value : "month",
       date: els.date.value,
       end: els.end ? els.end.value : "",
+      newRent: els.newRent ? els.newRent.value : "",
       mode: mode,
       method: els.method.value,
       countKeyDay: els.keyday.checked,
@@ -95,7 +104,47 @@
 
   var lastResult = null;
 
+  function renderChange() {
+    var input = current();
+    var r = E.prorateChange({ rent: input.rent, newRent: input.newRent, date: input.date, period: input.period });
+    els.cheque.hidden = true;
+    els.traps.hidden = true;
+    if (r.error) {
+      els.sub.textContent = "";
+      els.methods.innerHTML = "<p class='hint'>" +
+        (r.error === "newRent" ? "Put in the new rent." : r.error === "rent" ? "Put in the current rent." : "Pick the day the new rent starts.") +
+        "</p>";
+      els.spread.textContent = "";
+      return;
+    }
+    els.sub.textContent = "Rent changes from " + money(r.oldRent) + " to " + money(r.newRent) +
+      " on the " + ordinal(r.changeDay) + ": " + r.daysOld + " day" + (r.daysOld === 1 ? "" : "s") +
+      " at the old rent, " + r.daysNew + " at the new.";
+    els.methods.innerHTML = "";
+    r.methods.forEach(function (m) {
+      var row = document.createElement("div");
+      row.className = "method" + (m.amount === r.cheapest ? "" : "");
+      var tags = "";
+      if (m.amount === r.cheapest) tags += "<span class='tag good'>Lowest</span>";
+      if (m.amount === r.dearest && r.spread > 0) tags += "<span class='tag warn'>Highest</span>";
+      row.innerHTML =
+        "<div class='m-main'>" +
+          "<h3>" + m.name + " " + tags + "</h3>" +
+          "<p class='m-note'>" + r.daysOld + " × old + " + r.daysNew + " × new daily rate" +
+            (m.added >= 0 ? " · " + money(m.added) + " more than a full old month" : " · " + money(-m.added) + " less than a full old month") +
+          "</p>" +
+        "</div>" +
+        "<div class='m-amount'>" + money(m.amount) + "</div>";
+      els.methods.appendChild(row);
+    });
+    els.spread.innerHTML = r.spread > 0
+      ? "The methods range by <b>" + money(r.spread) + "</b> for this month. Your lease (or the Section 13 notice) decides which applies."
+      : "";
+    if (window.Kee) Kee.context({ ready: true, result: true });
+  }
+
   function render() {
+    if (mode === "change") { renderChange(); return; }
     if (mode === "range") { renderRange(); return; }
     var input = current();
     var r = E.prorate(input);
