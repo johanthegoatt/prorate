@@ -227,3 +227,33 @@ test("prorate carries the claim check only when a figure is given", () => {
   const without = P.prorate({ rent: "1200", date: "2026-03-15", method: "actual" });
   assert.strictEqual(without.claim, null);
 });
+
+test("prorateChange: old rent before the change, new rent from the change day", () => {
+  // Rent rises from 1000 to 1200 on the 16th of a 30-day month (Sept).
+  const r = P.prorateChange({ rent: "1000", newRent: "1200", date: "2026-09-16" });
+  assert.ok(!r.error);
+  assert.strictEqual(r.daysOld, 15);   // 1st..15th at the old rent
+  assert.strictEqual(r.daysNew, 15);   // 16th..30th at the new rent
+  const actual = r.methods.find((m) => m.key === "actual");
+  // 15/30 * 1000 + 15/30 * 1200 = 500 + 600 = 1100
+  assert.ok(Math.abs(actual.amount - 1100) < 0.01);
+  assert.ok(Math.abs(actual.added - 100) < 0.01); // 100 more than a full old month
+});
+
+test("prorateChange: a change on the 1st is a full month at the new rent", () => {
+  const r = P.prorateChange({ rent: "1000", newRent: "1200", date: "2026-06-01" });
+  assert.strictEqual(r.daysOld, 0);
+  assert.strictEqual(r.daysNew, 30);
+  const actual = r.methods.find((m) => m.key === "actual");
+  assert.ok(Math.abs(actual.amount - 1200) < 0.01);
+});
+
+test("prorateChange: a decrease adds a negative amount", () => {
+  const r = P.prorateChange({ rent: "1200", newRent: "1000", date: "2026-06-16" });
+  const actual = r.methods.find((m) => m.key === "actual");
+  assert.ok(actual.added < 0);
+});
+
+test("prorateChange: bad new rent returns an error", () => {
+  assert.strictEqual(P.prorateChange({ rent: "1000", newRent: "0", date: "2026-06-16" }).error, "newRent");
+});
